@@ -45,13 +45,13 @@ struct GameState
 
 void inicializar_gamestate(GameState& gs)
 {
-	gs.palabra 	  = L"";
-	gs.n_intentos 	  = 0;
-	gs.adivinada	  = false;
-	gs.let_res.elem	  = ABECEDARIO;
-	gs.let_res.nelems = MAXLETRAS;
-	gs.let_adv.elem	  = {};
-	gs.let_adv.nelems = 0;
+	gs.palabra		= L"";
+	gs.n_intentos		= 0;
+	gs.adivinada		= false;
+	gs.let_res.elem		= ABECEDARIO;
+	gs.let_res.nelems	= MAXLETRAS;
+	gs.let_adv.elem		= {};
+	gs.let_adv.nelems	= 0;
 }
 
 void linea()
@@ -203,7 +203,7 @@ void actualizar_palabra(wstring& palabra, const wstring& preview_palabra)
 	palabra = preview_palabra;
 }
 
-int get_pos_wchar_t_list(const ListWChar27& lista_wchar_t, wchar_t letra)
+int get_pos_wchar_list(const ListWChar27& lista_wchar_t, wchar_t letra)
 {
 	bool encontrada = false;
 	int i = 0;
@@ -231,8 +231,13 @@ void actualizar_restantes(ListWChar27& letras_restantes, wchar_t letra_adivinada
 	}
 	else
 	{ 	// Sustituir letra a eleminar por la última, y decrementar tamaño
-	  	int pos = get_pos_wchar_t_list(letras_restantes, letra_adivinada);
-		letras_restantes.elem[pos] = letras_restantes.elem[letras_restantes.nelems - 1];
+	  	int pos = get_pos_wchar_list(letras_restantes, letra_adivinada);
+		for (int i = pos+1; i < letras_restantes.nelems; ++i)
+		{
+			wchar_t aux = letras_restantes.elem[i];
+			letras_restantes.elem[i] = letras_restantes.elem[i-1];
+			letras_restantes.elem[i-1] = aux;
+		}
 		letras_restantes.nelems--;
 	}
 }
