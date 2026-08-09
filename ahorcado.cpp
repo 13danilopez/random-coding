@@ -13,12 +13,14 @@ const int LONGLINEA = 75;
 typedef array<wchar_t, MAXLETRAS>ArrayWChar27;
 typedef array<int, MAXNUMS>ArrayInt100;
 
-struct ListWChar27 {
+struct ListWChar27 
+{
 	int nelems = 0;
 	ArrayWChar27 elem;
 };
 
-struct ListInt100 {
+struct ListInt100 
+{
 	int nelems = 0;
 	ArrayInt100 elem;
 };
@@ -30,48 +32,61 @@ const ArrayWChar27 ABECEDARIO =
 	L'R', L'S', L'T', L'U', L'V', L'W', L'X', L'Y', L'Z'
 };
 
+struct GameState
+{
+	wstring palabra;
+	int n_intentos;
+	bool adivinada;
+	ListWChar27 let_res;
+	ListWChar27 let_adv;
+};
+
 // =[FUNCIONES]==================================================================== //
+
+void inicializar_gamestate(GameState& gs)
+{
+	gs.palabra 	  = L"";
+	gs.n_intentos 	  = 0;
+	gs.adivinada	  = false;
+	gs.let_res.elem	  = ABECEDARIO;
+	gs.let_res.nelems = MAXLETRAS;
+	gs.let_adv.elem	  = {};
+	gs.let_adv.nelems = 0;
+}
 
 void linea()
 {
+	wcout << endl;
 	for (int i = 0; i < LONGLINEA; ++i) { wcout << L"="; }
 	wcout << endl << endl;
 }
 
-void inicio(int& n_letras_palabra) 
+void inicializar_palabra(GameState& gs, int n_letras) 
 {
-	wcout << endl;
+	for (int i = 0; i < n_letras; ++i) { gs.palabra.append(L"_"); }
+}
+
+void inicio(GameState& gs) 
+{
 	linea();
 	wcout << L"¡Hola! Vamos a jugar a un juego de Ahorcado." << endl;
 	wcout << L"Piensa en la palabra que quieres que intente adivinar." << endl;
 	wcout << endl;
-	wcout << L"Introduce el número de letras de tu palabra: ";
-	wcin >> n_letras_palabra;
-	while (n_letras_palabra <= 0) 
-	{
-		wcout << L"Número de letras no válido. Introduce el número de letras de tu palabra: ";
-		wcin >> n_letras_palabra;
-	}
+
+	int n_letras;
+	do {
+		wcout << L"Introduce el número de letras de tu palabra (1..27): ";
+		wcin >> n_letras;
+	} while (n_letras < 1 || n_letras > MAXLETRAS);
+
+	inicializar_palabra(gs, n_letras);
+}
+
+void mostrar_palabra(const wstring& palabra) 
+{
+	for (int i = 0; i < palabra.length(); ++i) { wcout << palabra[i] << L" "; }
 	wcout << endl;
-}
-
-void inicializar_restantes(ListWChar27& letras_restantes)
-{
-	letras_restantes.elem = ABECEDARIO;
-	letras_restantes.nelems = MAXLETRAS;
-}
-
-void inicializar_palabra(wstring& palabra, int n) 
-{
-	palabra = L"";
-	for (int i = 0; i < n; ++i) { palabra.append(L"_"); }
-}
-
-void mostrar_palabra(const wstring& palabra, int n) 
-{
-	for (int i = 0; i < n; ++i) { wcout << palabra[i] << L" "; }
-	wcout << endl;
-	for (int i = 1; i <= n; ++i) { wcout << i << L" "; } // Mostrar índices debajo
+	for (int idx = 1; idx <= palabra.length(); ++idx) { wcout << idx << L" "; } // Mostrar índices debajo
 	wcout << endl;
 }
 
@@ -92,6 +107,16 @@ void mostrar_adivinadas(const ListWChar27& letras_adivinadas)
 	{
 		wcout << letras_adivinadas.elem[i] << L" ";
 	}
+	wcout << endl;
+}
+
+void mostrar_gamestate(GameState& gs)
+{
+	linea();
+	mostrar_palabra(gs.palabra);
+	wcout << endl;
+	mostrar_restantes(gs.let_res);
+	mostrar_adivinadas(gs.let_adv);
 	wcout << endl;
 }
 
@@ -268,12 +293,12 @@ bool get_contiene_letra(wchar_t letra_adivinada)
 	return contiene;
 }
 
-bool validar_posiciones(const ListInt100& lista_posiciones, const wstring& palabra, int n_letras_palabra)
+bool validar_posiciones(const ListInt100& lista_posiciones, const wstring& palabra)
 {
 	if (lista_posiciones.nelems == 0) return false;
 
 	int min = 1;
-	int max = n_letras_palabra;
+	int max = palabra.length();
 	
 	bool validas = true;
 	int i = 0;
@@ -287,7 +312,7 @@ bool validar_posiciones(const ListInt100& lista_posiciones, const wstring& palab
 	return validas;
 }
 
-ListInt100 get_posiciones_letra(wchar_t letra_adivinada, const wstring& palabra, int n_letras_palabra)
+ListInt100 get_posiciones_letra(const wstring& palabra, wchar_t letra_adivinada)
 {
 	ListInt100 lista_posiciones;
 	bool posiciones_validas = false;
@@ -296,7 +321,7 @@ ListInt100 get_posiciones_letra(wchar_t letra_adivinada, const wstring& palabra,
 		wstring str_posiciones;
 		wcin >> str_posiciones;
 		lista_posiciones = parse_posiciones(str_posiciones);	// Si hay algún error en el parsing --> devuelve lista empty
-		posiciones_validas = validar_posiciones(lista_posiciones, palabra, n_letras_palabra);
+		posiciones_validas = validar_posiciones(lista_posiciones, palabra);
 	} while (!posiciones_validas);
 	return lista_posiciones;
 }
@@ -337,70 +362,55 @@ bool get_confirmacion_preview(const wstring& preview_palabra)
 	return ok_preview;
 }
 
-void ahorcado(wstring& palabra, int n_letras_palabra, int& cnt_intentos, bool& adivinada) 
+
+
+void ahorcado(GameState& gs) 
 {
-	// INICIALIZACIÓN DE VARIABLES & ESTRUCTURAS
+	// VARIABLES & ESTRUCTURAS
 	bool fin = false;
-	ListWChar27 letras_restantes;	// Guardar las letras que quedan por adivinar (evitar repeticiones)
-	ListWChar27 letras_adivinadas;	// Guardar las letras ya adivinadas
-	
-	cnt_intentos = 0;		// Inicializar parámetros pasados por referencia
-	adivinada = false;
-
-	inicializar_restantes(letras_restantes);	// Inicializar las restantes al abecedario inicial definido
-	inicializar_palabra(palabra, n_letras_palabra);	// Inicializar la palabra según el número de letras indicado
-	
-	// GAME LOOP
-	while (!adivinada && !fin)
-	{
-		linea();
 		
-		mostrar_palabra(palabra, n_letras_palabra);				// [1] Mostrar estado del juego
-		wcout << endl;
-		mostrar_restantes(letras_restantes);
-		mostrar_adivinadas(letras_adivinadas);
-		wcout << endl;
-
-		wchar_t letra_adivinada = adivinar_letra(letras_restantes); 		// [2] Adivinar una letra de las restantes
-		bool contiene = get_contiene_letra(letra_adivinada);			// [3] Preguntar si la palabra contiene la letra
-		if (contiene)								// [4] Si la respuesta es SÍ...
+	// GAME LOOP
+	while (!gs.adivinada && !fin)
+	{
+		mostrar_gamestate(gs);						// [1] Mostrar estado del juego
+		
+		wchar_t letra_adivinada = adivinar_letra(gs.let_res); 		// [2] Adivinar una letra de las restantes
+		bool contiene = get_contiene_letra(letra_adivinada);		// [3] Preguntar si la palabra contiene la letra
+		if (contiene)							// [4] Si la respuesta es SÍ...
 		{
 			ListInt100 lista_posiciones;
 			wstring preview_palabra;
 			bool ok_preview;
 			do {
-				lista_posiciones = get_posiciones_letra(letra_adivinada, palabra, n_letras_palabra);	// [5] Preguntar posiciones
-				preview_palabra = get_preview_palabra(palabra, lista_posiciones, letra_adivinada);	// [6] Crear una preview
-				ok_preview = get_confirmacion_preview(preview_palabra);					// [7] Preguntar confirmación
+				lista_posiciones = get_posiciones_letra(gs.palabra, letra_adivinada);			// [4.1] Preguntar posiciones
+				preview_palabra = get_preview_palabra(gs.palabra, lista_posiciones, letra_adivinada);	// [4.2] Crear una preview
+				ok_preview = get_confirmacion_preview(preview_palabra);					// [4.3] Preguntar confirmación
 			} while (!ok_preview);										// [*] Bucle para confirmación
 
-			actualizar_palabra(palabra, preview_palabra);			// [8] Una vez confirmado, actualizar la palabra real
+			actualizar_palabra(gs.palabra, preview_palabra);			// [4.4] Una vez confirmado, actualizar la palabra real
 		}
 				
-		actualizar_restantes(letras_restantes, letra_adivinada);		// [9] Actualizar lista de letras restantes (eliminar)
-		actualizar_adivinadas(letras_adivinadas, letra_adivinada);		// [10] Actualizar lista de letras adivinadas (añadir)
+		actualizar_restantes(gs.let_res, letra_adivinada);		// [5] Actualizar lista de letras restantes (eliminar)
+		actualizar_adivinadas(gs.let_adv, letra_adivinada);		// [6] Actualizar lista de letras adivinadas (añadir)
 
-		cnt_intentos++;								// [11] Incrementar número de intentos usados
-		if (palabra_completa(palabra)) adivinada = true;			// [12] Checkear si la palabra ya ha sido adivinada
-		if (letras_restantes.nelems == 0) fin = true;				// [13] Checkear en caso de quedarse sin letras (por si no acierta)
-		
-		wcout << endl;
+		gs.n_intentos++;						// [7] Incrementar número de intentos usados
+		if (palabra_completa(gs.palabra)) gs.adivinada = true;		// [8] Checkear si la palabra ya ha sido adivinada
+		if (gs.let_res.nelems == 0) fin = true;				// [9] Checkear en caso de quedarse sin letras (por si no acierta)
 	}
 }
 
-void fin(const wstring& palabra, int cnt_intentos, bool adivinada)
+void fin(const GameState& gs)
 {
 	linea();
-	if (adivinada)
+	if (gs.adivinada)
 	{	// Si ha sido adivinada...
-		wcout << L"¡La adiviné! Tu palabra es: " << palabra << endl;
-		wcout << L"Número de intentos: " << cnt_intentos << endl;
+		wcout << L"¡La adiviné! Tu palabra es: " << gs.palabra << endl;
+		wcout << L"Número de intentos: " << gs.n_intentos << endl;
 	}
 	else
 	{	// Si no ha sido adivinada...
 		wcout << L"¡Imposible! ¡Tienes que haberte equivocado!" << endl;
 	}
-	wcout << endl;
 	linea();
 }
 
@@ -411,15 +421,13 @@ int main()
 	std::locale::global(std::locale(""));	// Configurar soporte de caracteres especiales en la consola
 	std::wcout.imbue(std::locale(""));
 	std::wcin.imbue(std::locale(""));
+	
+	GameState gs;
+	inicializar_gamestate(gs);
 
-	wstring palabra;
-	int n_letras_palabra;
-	int cnt_intentos;
-	bool adivinada;
-
-	inicio(n_letras_palabra);
-	ahorcado(palabra, n_letras_palabra, cnt_intentos, adivinada);
-	fin(palabra, cnt_intentos, adivinada);
+	inicio(gs);
+	ahorcado(gs);
+	fin(gs);
 
 	return 0;
 }
