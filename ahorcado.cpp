@@ -32,9 +32,16 @@ const ArrayWChar27 ABECEDARIO =
 
 // =[FUNCIONES]==================================================================== //
 
+void linea()
+{
+	for (int i = 0; i < LONGLINEA; ++i) { wcout << L"="; }
+	wcout << endl << endl;
+}
+
 void inicio(int& n_letras_palabra) 
 {
 	wcout << endl;
+	linea();
 	wcout << L"¡Hola! Vamos a jugar a un juego de Ahorcado." << endl;
 	wcout << L"Piensa en la palabra que quieres que intente adivinar." << endl;
 	wcout << endl;
@@ -110,11 +117,6 @@ wchar_t adivinar_letra(const ListWChar27& letras_restantes)
 	return letras_restantes.elem[rand_int];
 }
 
-inline bool es_respuesta_valida(wchar_t respuesta)
-{
-	return respuesta == L'y' || respuesta == L'Y' || respuesta == L'n' || respuesta == L'N';
-}
-
 ListInt100 parse_comas(wstring wstring_posiciones)
 {
 	ListInt100 lista_comas;
@@ -172,23 +174,9 @@ ListInt100 parse_posiciones(wstring str_posiciones)
 	return lista_posiciones;
 }
 
-void actualizar_palabra(wstring& palabra, const ListInt100& lista_posiciones, wchar_t letra_adivinada)
+void actualizar_palabra(wstring& palabra, const wstring& preview_palabra)
 {
-	for (int i = 0; i < lista_posiciones.nelems; ++i)
-	{
-		int posicion = lista_posiciones.elem[i] - 1;
-		if (palabra[posicion] != L'_')
-		{
-			wcout << L"Error. Ya hay adivinada la letra en la posición " << posicion << L"." << endl;
-			exit(-1);
-		}
-		if (posicion < 0 || posicion > palabra.length()-1)
-		{
-			wcout << L"Error. La posición " << posicion << L" está fuera del rango de la palabra." << endl;
-			exit(-1);
-		}
-		palabra[posicion] = letra_adivinada;
-	}
+	palabra = preview_palabra;
 }
 
 int get_pos_wchar_t_list(const ListWChar27& lista_wchar_t, wchar_t letra)
@@ -259,14 +247,89 @@ bool palabra_completa(const wstring& palabra)
 	return ok;
 }
 
-void linea()
+bool get_contiene_letra(wchar_t letra_adivinada)
 {
-	for (int i = 0; i < LONGLINEA; ++i) { wcout << L"="; }
-	wcout << endl << endl;
+	bool contiene = false;
+	bool respuesta_valida = false;
+	wchar_t respuesta;
+	do {
+		wcout << L"¿Contiene tu palabra la letra [" << letra_adivinada << L"]? (y/N): ";
+		wcin >> respuesta;
+		std::wcin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); 	// (*) Limpiar input buffer (en caso de poner varias letras)
+		
+		if 	(respuesta == L'y' || respuesta == L'Y') 
+		{
+			contiene = true;  respuesta_valida = true;
+		}
+		else if (respuesta == L'n' || respuesta == L'N') 
+		{
+			contiene = false; respuesta_valida = true;
+		}
+	} while (!respuesta_valida);
+	return contiene;
+}
+
+ListInt100 get_posiciones_letra(wchar_t letra_adivinada)
+{
+	ListInt100 lista_posiciones;
+	do {
+		wcout << L"Indica en qué posiciones hay una [" << letra_adivinada << L"] (e.g. 1,4,7): ";
+		wstring str_posiciones;
+		wcin >> str_posiciones;
+		lista_posiciones = parse_posiciones(str_posiciones); // AÑADIR EN PARSE --> ERROR --> RETURN EMPTY LIST
+	} while (lista_posiciones.nelems == 0);
+	return lista_posiciones;
+}
+
+wstring get_preview_palabra(const wstring& palabra, const ListInt100& lista_posiciones, wchar_t letra_adivinada)
+{
+	wstring preview_palabra = palabra;
+	for (int i = 0; i < lista_posiciones.nelems; ++i)
+	{
+		int posicion = lista_posiciones.elem[i] - 1;
+		if (preview_palabra[posicion] != L'_')
+		{
+			wcout << L"Error. Ya hay adivinada la letra en la posición " << posicion << L"." << endl;
+			exit(-1);
+		}
+		if (posicion < 0 || posicion > preview_palabra.length()-1)
+		{
+			wcout << L"Error. La posición " << posicion << L" está fuera del rango de la palabra." << endl;
+			exit(-1);
+		}
+		preview_palabra[posicion] = letra_adivinada;
+	}
+	return preview_palabra;
+}
+
+
+bool get_confirmacion_preview(const wstring& preview_palabra)
+{
+	bool ok_preview = false;
+	bool respuesta_valida = false;
+	wchar_t respuesta;
+	do {
+		wcout << L"¿Confirmar [ "; 
+		for (int i = 0; i < preview_palabra.length(); ++i) { wcout << preview_palabra[i] << L" "; }
+		wcout << L"]? (y/N): ";
+		wcin >> respuesta;
+		std::wcin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); 	// (*) Limpiar input buffer (en caso de poner varias letras)
+		
+		if 	(respuesta == L'y' || respuesta == L'Y') 
+		{
+			ok_preview = true;  respuesta_valida = true;
+		}
+		else if (respuesta == L'n' || respuesta == L'N') 
+		{
+			ok_preview = false; respuesta_valida = true;
+		}
+	} while (!respuesta_valida);
+	return ok_preview;
 }
 
 void ahorcado(wstring& palabra, int n_letras_palabra, int& cnt_intentos, bool& adivinada) 
 {
+	// INICIALIZACIÓN DE VARIABLES & ESTRUCTURAS
 	bool fin = false;
 	ListWChar27 letras_restantes;	// Guardar las letras que quedan por adivinar (evitar repeticiones)
 	ListWChar27 letras_adivinadas;	// Guardar las letras ya adivinadas
@@ -276,48 +339,48 @@ void ahorcado(wstring& palabra, int n_letras_palabra, int& cnt_intentos, bool& a
 
 	inicializar_restantes(letras_restantes);	// Inicializar las restantes al abecedario inicial definido
 	inicializar_palabra(palabra, n_letras_palabra);	// Inicializar la palabra según el número de letras indicado
-
+	
+	// GAME LOOP
 	while (!adivinada && !fin)
 	{
 		linea();
-
-		mostrar_palabra(palabra, n_letras_palabra);					// [1] Mostrar estado del juego
+		
+		mostrar_palabra(palabra, n_letras_palabra);				// [1] Mostrar estado del juego
 		wcout << endl;
 		mostrar_restantes(letras_restantes);
 		mostrar_adivinadas(letras_adivinadas);
 		wcout << endl;
 
-		wchar_t letra_adivinada = adivinar_letra(letras_restantes); 			// [2] Adivinar una letra de las restantes y preguntar
-		wchar_t respuesta;
-		do {										// (*) Bucle en caso de respuesta no válida (distinta de y/N)
-			wcout << L"¿Contiene tu palabra la letra [" << letra_adivinada << L"]? (y/N): ";
-			wcin >> respuesta;
-			std::wcin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); 	// (*) Limpiar input buffer (en caso de poner varias letras)
-			if (respuesta == L'y' || respuesta == L'Y')				// [3] Si la respuesta es SÍ => preguntar posiciones
-			{
-				wcout << L"Indica en qué posiciones hay una [" << letra_adivinada << L"] (e.g. 1,4,7): ";
-				wstring str_posiciones;
-				wcin >> str_posiciones;
-				ListInt100 lista_posiciones = parse_posiciones(str_posiciones); // [4] Parseo de posiciones del wstring dado
-				actualizar_palabra(palabra, lista_posiciones, letra_adivinada);	// [5] Actualizar la palabra de acuerdo con las posiciones
-			}
-		} while (!es_respuesta_valida(respuesta));
-		
-		actualizar_restantes(letras_restantes, letra_adivinada);			// [6] Actualizar lista de letras restantes (eliminar)
-		actualizar_adivinadas(letras_adivinadas, letra_adivinada);			// [7] Actualizar lista de letras adivinadas (añadir)
+		wchar_t letra_adivinada = adivinar_letra(letras_restantes); 		// [2] Adivinar una letra de las restantes
+		bool contiene = get_contiene_letra(letra_adivinada);			// [3] Preguntar si la palabra contiene la letra
+		if (contiene)								// [4] Si la respuesta es SÍ...
+		{
+			ListInt100 lista_posiciones;
+			wstring preview_palabra;
+			bool ok_preview;
+			do {
+				lista_posiciones = get_posiciones_letra(letra_adivinada);				// [5] Preguntar posiciones
+				preview_palabra = get_preview_palabra(palabra, lista_posiciones, letra_adivinada);	// [6] Crear una preview
+				ok_preview = get_confirmacion_preview(preview_palabra);					// [7] Preguntar confirmación
+			} while (!ok_preview);										// [*] Bucle para confirmación
 
-		cnt_intentos++;									// [8] Incrementar número de intentos usados
-		if (palabra_completa(palabra)) adivinada = true;				// [9] Checkear si la palabra ya ha sido adivinada
-		if (letras_restantes.nelems == 0) fin = true;					// [10] Checkear en caso de quedarse sin letras (por si no acierta)
+			actualizar_palabra(palabra, preview_palabra);			// [8] Una vez confirmado, actualizar la palabra real
+		}
+				
+		actualizar_restantes(letras_restantes, letra_adivinada);		// [9] Actualizar lista de letras restantes (eliminar)
+		actualizar_adivinadas(letras_adivinadas, letra_adivinada);		// [10] Actualizar lista de letras adivinadas (añadir)
+
+		cnt_intentos++;								// [11] Incrementar número de intentos usados
+		if (palabra_completa(palabra)) adivinada = true;			// [12] Checkear si la palabra ya ha sido adivinada
+		if (letras_restantes.nelems == 0) fin = true;				// [13] Checkear en caso de quedarse sin letras (por si no acierta)
 		
 		wcout << endl;
 	}
-	
-	linea();
 }
 
 void fin(const wstring& palabra, int cnt_intentos, bool adivinada)
 {
+	linea();
 	if (adivinada)
 	{	// Si ha sido adivinada...
 		wcout << L"¡La adiviné! Tu palabra es: " << palabra << endl;
@@ -327,6 +390,8 @@ void fin(const wstring& palabra, int cnt_intentos, bool adivinada)
 	{	// Si no ha sido adivinada...
 		wcout << L"¡Imposible! ¡Tienes que haberte equivocado!" << endl;
 	}
+	wcout << endl;
+	linea();
 }
 
 // =[MAIN]========================================================================= //
