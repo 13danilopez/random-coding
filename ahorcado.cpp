@@ -137,38 +137,37 @@ ListInt100 parse_posiciones(wstring str_posiciones)
 	ListInt100 lista_comas;
 	lista_comas = parse_comas(str_posiciones);	// Las posiciones de las comas y el número de comas son usadas para sacar los números
 	
-	if (lista_comas.nelems == 0)
-	{ 	// Si solo es una posición...
-		lista_posiciones.elem[0] = stoi(str_posiciones);
-		lista_posiciones.nelems++;
-	}
-	else
-	{	// Si son varias posiciones...
-		int n_posiciones = lista_comas.nelems + 1;	// Número de posiciones dado por num_comas+1
-		for (int i = 0; i < n_posiciones; ++i)	
-		{
-			wstring aux_wstring;
-			int pos_ini = -1;	// Sacamos la substr sabiendo la pos_ini y la pos_fin
-			int pos_fin = -1;	// Usaremos las posiciones de las comas que preceden y suceden para esto
-			if (i == 0)
-			{	// Si es el primer número... [CASO BASE]
-				pos_ini = 0;
-				pos_fin = lista_comas.elem[0] - 1;
-			}
-			else if (i == lista_comas.nelems)
-			{	// Si es el último número... [CASO BASE]
-				pos_ini = lista_comas.elem[lista_comas.nelems-1] + 1;
-				pos_fin = str_posiciones.length() - 1;
-			}
-			else
-			{	// Si está en medio... [CASO GENERAL]
-				pos_ini = lista_comas.elem[i-1] + 1;
-				pos_fin = lista_comas.elem[i] - 1;
-			}
+	int n_posiciones = lista_comas.nelems + 1;	// Número de posiciones dado por num_comas+1
+	for (int i = 0; i < n_posiciones; ++i)	
+	{
+		wstring aux_wstring;
+		int pos_ini = -1;	// Sacamos la substr sabiendo la pos_ini y la pos_fin
+		int pos_fin = -1;	// Usaremos las posiciones de las comas que preceden y suceden para esto
+		if (i == 0)
+		{	// Si es el primer número... [CASO BASE]
+			pos_ini = 0;
+			pos_fin = lista_comas.elem[0] - 1;
+		}
+		else if (i == lista_comas.nelems)
+		{	// Si es el último número... [CASO BASE]
+			pos_ini = lista_comas.elem[lista_comas.nelems-1] + 1;
+			pos_fin = str_posiciones.length() - 1;
+		}
+		else
+		{	// Si está en medio... [CASO GENERAL]
+			pos_ini = lista_comas.elem[i-1] + 1;
+			pos_fin = lista_comas.elem[i] - 1;
+		}
+
+		try {
 			aux_wstring = str_posiciones.substr(pos_ini, pos_fin - pos_ini + 1);	// Extraer subcadena
 			int posicion = stoi(aux_wstring);					// Conversión a int con stoi()
 			lista_posiciones.elem[lista_posiciones.nelems] = posicion;		// Añadir a lista de posiciones
 			lista_posiciones.nelems++;
+		} catch (exception e) {
+			lista_posiciones.elem = {};
+			lista_posiciones.nelems = 0;
+			return lista_posiciones;
 		}
 	}
 	return lista_posiciones;
@@ -244,7 +243,7 @@ bool palabra_completa(const wstring& palabra)
 		if (palabra[i] == L'_') ok = false;
 		++i;
 	}
-	return ok;
+	return ok;	
 }
 
 bool get_contiene_letra(wchar_t letra_adivinada)
@@ -269,15 +268,36 @@ bool get_contiene_letra(wchar_t letra_adivinada)
 	return contiene;
 }
 
-ListInt100 get_posiciones_letra(wchar_t letra_adivinada)
+bool validar_posiciones(const ListInt100& lista_posiciones, const wstring& palabra, int n_letras_palabra)
+{
+	if (lista_posiciones.nelems == 0) return false;
+
+	int min = 1;
+	int max = n_letras_palabra;
+	
+	bool validas = true;
+	int i = 0;
+	while (validas && i < lista_posiciones.nelems)
+	{
+		int pos = lista_posiciones.elem[i];
+		if (pos < min || pos > max || palabra[pos-1] != L'_') validas = false;
+		++i;
+	}
+
+	return validas;
+}
+
+ListInt100 get_posiciones_letra(wchar_t letra_adivinada, const wstring& palabra, int n_letras_palabra)
 {
 	ListInt100 lista_posiciones;
+	bool posiciones_validas = false;
 	do {
 		wcout << L"Indica en qué posiciones hay una [" << letra_adivinada << L"] (e.g. 1,4,7): ";
 		wstring str_posiciones;
 		wcin >> str_posiciones;
-		lista_posiciones = parse_posiciones(str_posiciones); // AÑADIR EN PARSE --> ERROR --> RETURN EMPTY LIST
-	} while (lista_posiciones.nelems == 0);
+		lista_posiciones = parse_posiciones(str_posiciones);	// Si hay algún error en el parsing --> devuelve lista empty
+		posiciones_validas = validar_posiciones(lista_posiciones, palabra, n_letras_palabra);
+	} while (!posiciones_validas);
 	return lista_posiciones;
 }
 
@@ -287,16 +307,6 @@ wstring get_preview_palabra(const wstring& palabra, const ListInt100& lista_posi
 	for (int i = 0; i < lista_posiciones.nelems; ++i)
 	{
 		int posicion = lista_posiciones.elem[i] - 1;
-		if (preview_palabra[posicion] != L'_')
-		{
-			wcout << L"Error. Ya hay adivinada la letra en la posición " << posicion << L"." << endl;
-			exit(-1);
-		}
-		if (posicion < 0 || posicion > preview_palabra.length()-1)
-		{
-			wcout << L"Error. La posición " << posicion << L" está fuera del rango de la palabra." << endl;
-			exit(-1);
-		}
 		preview_palabra[posicion] = letra_adivinada;
 	}
 	return preview_palabra;
@@ -359,7 +369,7 @@ void ahorcado(wstring& palabra, int n_letras_palabra, int& cnt_intentos, bool& a
 			wstring preview_palabra;
 			bool ok_preview;
 			do {
-				lista_posiciones = get_posiciones_letra(letra_adivinada);				// [5] Preguntar posiciones
+				lista_posiciones = get_posiciones_letra(letra_adivinada, palabra, n_letras_palabra);	// [5] Preguntar posiciones
 				preview_palabra = get_preview_palabra(palabra, lista_posiciones, letra_adivinada);	// [6] Crear una preview
 				ok_preview = get_confirmacion_preview(preview_palabra);					// [7] Preguntar confirmación
 			} while (!ok_preview);										// [*] Bucle para confirmación
